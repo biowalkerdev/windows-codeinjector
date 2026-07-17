@@ -24,7 +24,7 @@ jobs:
       - name: Create Release and Upload EXE
         uses: softprops/action-gh-release@v2
         with:
-          files: bin\Release\net10.0\*.exe
+          files: bin\Release\net10.0\win-x64\publish\*.exe
           name: "Release ${{ github.ref_name }}"
           draft: false
           prerelease: false
