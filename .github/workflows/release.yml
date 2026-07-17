@@ -18,13 +18,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Build Release
-        run: dotnet publish -c Release -r win-x64 --self-contained
+      - name: Build Self-Contained EXE
+        run: dotnet publish -c Release -r win-x64 --self-contained -o ./publish
 
-      - name: Create Release and Upload EXE
+      - name: Upload EXE to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: bin\Release\net10.0\win-x64\publish\*.exe
+          files: ./publish/*.exe
           name: "Release ${{ github.ref_name }}"
           draft: false
           prerelease: false
