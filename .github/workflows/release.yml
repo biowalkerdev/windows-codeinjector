@@ -19,7 +19,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Build Release
-        run: dotnet build -c Release
+        run: dotnet publish -c Release -r win-x64 --self-contained
 
       - name: Create Release and Upload EXE
         uses: softprops/action-gh-release@v2
