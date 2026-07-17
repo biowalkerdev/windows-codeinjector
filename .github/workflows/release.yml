@@ -24,7 +24,7 @@ jobs:
       - name: Upload EXE to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: bin\Release\net10.0\windows-codeinjector.exe
+          files: bin\Release\net10.0\*.exe
           name: "Release ${{ github.ref_name }}"
           draft: false
           prerelease: false
