@@ -129,5 +129,8 @@ class Program
         {
             Console.WriteLine($"An unknown error has occurred: {ex}");
         }
+
+        Console.WriteLine("Press any key to exit...");
+        Console.ReadKey();
     }
 }
