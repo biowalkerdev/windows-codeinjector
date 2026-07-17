@@ -1,0 +1,32 @@
+name: Build And Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build Release
+        run: dotnet build -c Release
+
+      - name: Create Release and Upload EXE
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin\Release\net10.0\*.exe
+          name: "Release ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
