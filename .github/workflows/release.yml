@@ -16,12 +16,17 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Build
-        run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x64-${{ github.ref_name }} -o ./publish
+      - name: Build x64
+        run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x64-${{ github.ref_name }} -o ./publish/x64
+
+      - name: Build x86
+        run: dotnet publish -c Release -r win-x86 --self-contained -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x86-${{ github.ref_name }} -o ./publish/x86
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: ./publish/*.exe
+          files: |
+            ./publish/x64/*.exe
+            ./publish/x86/*.exe
           name: "Release ${{ github.ref_name }}"
           draft: false
           prerelease: false
