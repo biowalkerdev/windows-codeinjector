@@ -3,6 +3,9 @@
 THE AUTHOR DOES NOT CONDONE, ENDORSE, OR ENCOURAGE ANY ILLEGAL ACTIVITY
 THE USER IS SOLELY RESPONSIBLE FOR COMPLYING WITH ALL LOCAL LAWS AND REGULATIONS IN THEIR JURISDICTION
 
+If you think this program contains viruses, you can either avoid using it, or compile it yourself.  
+Antivirus software may falsely block a file.
+
 ### Usage
 To find out the real name of the process, you need to go to the scripts folder and run any file convenient for you.  
 There are two realname-reader files in the folder, one with the .py extension written in Python, the other with the .ps1 extension written in PowerShell.  
