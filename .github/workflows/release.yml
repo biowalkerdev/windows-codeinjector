@@ -22,11 +22,18 @@ jobs:
       - name: Build x86
         run: dotnet publish -c Release -r win-x86 --self-contained -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x86-${{ github.ref_name }} -o ./publish/x86
 
+      - name: Build x64 (Framework-dependent)
+        run: dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x64-framework-${{ github.ref_name }} -o ./publish/framework
+
+      - name: Build x86 (Framework-dependent)
+        run: dotnet publish -c Release -r win-x86 -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x86-framework-${{ github.ref_name }} -o ./publish/framework
       - uses: softprops/action-gh-release@v2
+
         with:
           files: |
             ./publish/x64/*.exe
             ./publish/x86/*.exe
+            ./publish/framework/*.exe
           name: "Release ${{ github.ref_name }}"
           draft: false
           prerelease: false
