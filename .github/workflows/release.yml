@@ -10,31 +10,38 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Build x64 (Self-contained)
-        run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x64-${{ github.ref_name }} -o ./publish/x64
+      - name: Build Self-contained x64
+        run: |
+          dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:PublishTrimmed=true -p:AssemblyName=windows-codeinjector_x64_${{ github.ref_name }} -o ./publish/self-contained/x64
 
-      - name: Build x86 (Self-contained)
-        run: dotnet publish -c Release -r win-x86 --self-contained -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x86-${{ github.ref_name }} -o ./publish/x86
+      - name: Build Self-contained x86
+        run: |
+          dotnet publish -c Release -r win-x86 --self-contained -p:PublishSingleFile=true -p:PublishTrimmed=true -p:AssemblyName=windows-codeinjector_x86_${{ github.ref_name }} -o ./publish/self-contained/x86
 
-      - name: Build x64 (Framework-dependent)
-        run: dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x64-framework-${{ github.ref_name }} -o ./publish/framework-x64
+      - name: Build Framework-dependent x64
+        run: |
+          dotnet publish -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x64_framework_${{ github.ref_name }} -o ./publish/framework/x64
 
-      - name: Build x86 (Framework-dependent)
-        run: dotnet publish -c Release -r win-x86 -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x86-framework-${{ github.ref_name }} -o ./publish/framework-x86
+      - name: Build Framework-dependent x86
+        run: |
+          dotnet publish -c Release -r win-x86 --no-self-contained -p:PublishSingleFile=true -p:AssemblyName=windows-codeinjector_x86_framework_${{ github.ref_name }} -o ./publish/framework/x86
 
-      - uses: softprops/action-gh-release@v2
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            ./publish/x64/*.exe
-            ./publish/x86/*.exe
-            ./publish/framework-x64/*.exe
-            ./publish/framework-x86/*.exe
+            ./publish/self-contained/x64/*.exe
+            ./publish/self-contained/x86/*.exe
+            ./publish/framework/x64/*.exe
+            ./publish/framework/x86/*.exe
           name: "Release ${{ github.ref_name }}"
           draft: false
           prerelease: false
