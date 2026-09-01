@@ -3,8 +3,7 @@
 THE AUTHOR DOES NOT CONDONE, ENDORSE, OR ENCOURAGE ANY ILLEGAL ACTIVITY
 THE USER IS SOLELY RESPONSIBLE FOR COMPLYING WITH ALL LOCAL LAWS AND REGULATIONS IN THEIR JURISDICTION
 
-If you think this program contains viruses, you can either avoid using it, or compile it yourself.  
-Antivirus software may falsely block a file.
+Binaries will no longer be published! If you want the latest version, compile it yourself.
 
 ### Usage
 To find out the real name of the process, you need to go to the scripts folder and run any file convenient for you.  
@@ -45,8 +44,9 @@ msfvenom -p <the payload you selected> --list-options
 ```
 After generation, copy the hex string
 
-Download and run the .exe  
-Enter what you selected when running any realname-reader script.  
+Compile and run the .exe  
+Afterwards, wait from 1 to 5 minutes for the program to bypass Windows Defender checks in the emulator.  
+When the programm started enter what you selected when running any realname-reader script.  
 After paste the resulting code from msfvenom
 If everything went well, you will see the message Success and how many bytes were written in total.
 
