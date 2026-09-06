@@ -45,17 +45,17 @@ msfvenom -p <the payload you selected> --list-options
 After generation, copy the hex string
 
 Compile and run the .exe  
-Afterwards, wait from 1 to 5 minutes for the program to bypass Windows Defender checks in the emulator.  
 When the programm started enter what you selected when running any realname-reader script.  
 After paste the resulting code from msfvenom
 If everything went well, you will see the message Success and how many bytes were written in total.
 
 ### Compile
-Open the project in Visual Studio 2022 (or newer)  
-Set the build configuration to `Release` 
-Build the solution by presing `Ctrl + Shift + B` or clicking `Build` -> `Build Solution`  
-The Compiled .exe will be generated in the following folder:  
-`bin\Release\net10.0\windows-codeinjector.exe`
+Open a command prompt in the project folder and run:  
+```
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+```
+Your compiled file will be located at this path:  
+`\bin\Release\net10.0\win-x64\publish`
 
 ### Compile Requirements
 - Visual Studio 2022 (or newer)
