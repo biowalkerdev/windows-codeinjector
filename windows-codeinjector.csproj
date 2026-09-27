@@ -10,7 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MyLocalNugety" Version="1.0.0" />
+    <PackageReference Include="PeNet" Version="6.1.2" />
   </ItemGroup>
-
 </Project>
